@@ -1,0 +1,45 @@
+{
+	"name": "collaboard",
+	"version": "1.0.0",
+	"description": "Collaborative Whiteboard Application",
+	"authors": {
+		"author 1": "Marshal Alone",
+		"author 2": "Vaishnavi Getme",
+		"author 3": "Mrunali Umak",
+		"author 4": "Sanskruti Patil",
+		"author 5": "Aditya Kawale"
+	},
+	"scripts": {
+		"start": "set NODE_OPTIONS=--no-deprecation && start http://localhost:5050 && cd backend && node server.js",
+		"dev": "set NODE_OPTIONS=--no-deprecation && start http://localhost:5050 && cd backend && nodemon server.js",
+		"kill-port": "node ./frontend/scripts/killPort.js",
+		"deploy": "node -e \"console.log('Run: deploy.bat (Windows) or ./deploy.sh (Mac/Linux)')\"",
+		"deploy:railway": "railway up",
+		"deploy:vercel": "vercel --prod"
+	}
+,
+	"dependencies": {
+		"@supabase/supabase-js": "^2.39.3",
+		"bcryptjs": "^2.4.3",
+		"connect-mongo": "^5.0.0",
+		"cookie-parser": "^1.4.6",
+		"dotenv": "^16.0.0",
+		"express": "^4.18.2",
+		"express-session": "^1.17.3",
+		"jsonwebtoken": "^9.0.2",
+		"mongodb": "^6.14.0",
+		"mongoose": "^6.0.0",
+		"open": "^10.1.1",
+		"punycode.js": "^2.3.1",
+		"socket.io": "^4.7.2",
+		"uuid": "^9.0.1"
+	},
+	"devDependencies": {
+		"concurrently": "^9.1.2",
+		"http-server": "^14.1.1",
+		"nodemon": "^3.1.9"
+	},
+	"overrides": {
+		"punycode": "npm:punycode.js@^2.3.1"
+	}
+}

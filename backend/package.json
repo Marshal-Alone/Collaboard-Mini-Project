@@ -1,0 +1,36 @@
+{
+	"name": "collaboard-backend",
+	"version": "1.0.0",
+	"description": "Backend for Collaboard application",
+	"main": "server.js",
+	"scripts": {
+		"start": "node server.js",
+		"dev": "nodemon server.js",
+		"frontend": "cd ../frontend && http-server -p 5050",
+		"nodemonstart": "concurrently \"npm run dev\" \"npm run frontend\"",
+		"build": "mkdir -p dist && cp -r *.html *.css *.js dist/"
+	},
+	"dependencies": {
+		"@supabase/supabase-js": "^2.39.3",
+		"bcryptjs": "^2.4.3",
+		"connect-mongo": "^5.0.0",
+		"cookie-parser": "^1.4.6",
+		"dotenv": "^16.0.0",
+		"express": "^4.18.2",
+		"express-session": "^1.17.3",
+		"jsonwebtoken": "^9.0.2",
+		"mongodb": "^6.14.0",
+		"mongoose": "^6.0.0",
+		"punycode.js": "^2.3.1",
+		"socket.io": "^4.7.2",
+		"uuid": "^9.0.1"
+	},
+	"devDependencies": {
+		"concurrently": "^9.1.2",
+		"http-server": "^14.1.1",
+		"nodemon": "^3.1.9"
+	},
+	"overrides": {
+		"punycode": "npm:punycode.js@^2.3.1"
+	}
+}
