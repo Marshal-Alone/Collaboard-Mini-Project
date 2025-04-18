@@ -11,9 +11,13 @@ document.addEventListener("DOMContentLoaded", function () {
 		return;
 	}
 
-	// Socket.io setup
-	const socket = io("http://localhost:5050", {
-		transports: ["websocket"],
+	// Socket.io setup - dynamic URL based on environment
+	const socketUrl = window.location.hostname === 'localhost' 
+		? 'http://localhost:5050' 
+		: window.location.origin;
+	
+	const socket = io(socketUrl, {
+		transports: ["websocket", "polling"],
 		reconnectionAttempts: 5,
 		reconnectionDelay: 1000,
 		reconnectionDelayMax: 5000,
