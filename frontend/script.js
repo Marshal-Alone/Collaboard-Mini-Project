@@ -1,12 +1,12 @@
 import config from "./config.js";
-// Dynamic configuration based on environment
-const config = {
-	API_URL: window.location.hostname === 'localhost' 
-		? 'http://localhost:5050' 
-		: window.location.origin
-};
-
 document.addEventListener("DOMContentLoaded", function () {
+	// Dynamic configuration based on environment
+	const config = {
+		API_URL: window.location.hostname === 'localhost' 
+			? 'http://localhost:5050' 
+			: window.location.origin
+	};
+
 	// Function to load past boards
 	const loadPastBoards = async () => {
 		const pastBoardsList = document.getElementById("pastBoardsList");
@@ -243,6 +243,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     <a href="#features">Features</a>
                     <a href="#pricing">Pricing</a>
                     <a href="#about">About</a>
+                    <a href="health.html" class="btn btn-outline">Server Health</a>
                     <span style="font-size: 1.2rem; font-weight: bold;" class="user-greeting" title="Logged in as ${
 											user.email || ""
 										}">
@@ -254,7 +255,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				// Add logout handler
 				document.getElementById("logoutBtn").addEventListener("click", async () => {
 					try {
-						await fetch("/api/logout", { method: "POST" });
+						await fetch(`${config.API_URL}/api/logout`, { method: "POST" });
 						localStorage.removeItem("token");
 						localStorage.removeItem("user");
 						window.location.href = "/";
@@ -267,6 +268,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     <a href="#features">Features</a>
                     <a href="#pricing">Pricing</a>
                     <a href="#about">About</a>
+                    <a href="health.html" class="btn btn-outline">Server Health</a>
                     <a href="auth.html?tab=login" class="btn btn-outline">Log in</a>
                     <a href="auth.html?tab=register" class="btn btn-primary">Sign up</a>
                 `;
@@ -297,7 +299,11 @@ document.addEventListener("DOMContentLoaded", function () {
 	const roomNameInput = document.getElementById("roomName");
 	const startBoardingButton = document.getElementById("startBoarding");
 
+	console.log("roomNameInput:", roomNameInput); // Debug
+	console.log("startBoardingButton:", startBoardingButton); // Debug
+
 	if (roomNameInput && startBoardingButton) {
+		console.log("✅ Both elements found, setting up event listener"); // Debug
 		// Set initial placeholder
 		roomNameInput.placeholder = "Enter your room name...";
 
@@ -318,6 +324,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		}, 3000); // Start changing after 3 seconds
 
 		startBoardingButton.addEventListener("click", async () => {
+			console.log("🎯 Start Boarding button clicked!"); // Debug log
 			let roomName = roomNameInput.value.trim();
 
 			// If no room name is provided, generate a random one
@@ -412,6 +419,11 @@ document.addEventListener("DOMContentLoaded", function () {
 					roomName
 				)}`;
 			}
+		});
+	} else {
+		console.error("❌ Elements not found!", {
+			roomNameInput,
+			startBoardingButton
 		});
 	}
 

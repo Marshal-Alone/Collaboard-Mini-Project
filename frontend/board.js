@@ -16,6 +16,11 @@ document.addEventListener("DOMContentLoaded", function () {
 		? 'http://localhost:5050' 
 		: window.location.origin;
 	
+	// API URL configuration - dynamic based on environment
+	const API_URL = window.location.hostname === 'localhost'
+		? 'http://localhost:5050'
+		: window.location.origin;
+	
 	const socket = io(socketUrl, {
 		transports: ["websocket", "polling"],
 		reconnectionAttempts: 5,
@@ -1762,7 +1767,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const token = localStorage.getItem("token");
 		if (token) {
 			try {
-				const response = await fetch("/api/user", {
+				const response = await fetch(`${API_URL}/api/user`, {
 					headers: {
 						Authorization: `Bearer ${token}`,
 					},
@@ -2635,7 +2640,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			this.isRedrawing = true;
 
 			try {
-				console.log("Redrawing all images");
+				// console.log("Redrawing all images");
 
 				// Create a temporary canvas to store current drawings
 				const tempCanvas = document.createElement("canvas");
