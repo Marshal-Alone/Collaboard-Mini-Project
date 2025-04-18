@@ -415,9 +415,22 @@ io.on("connection", (socket) => {
 	socket.on("joinRoom", async ({ roomId, userName, userId, password, hasLocalAuth }) => {
 		let roomName;
 		try {
-			const board = await Board.findOne({ roomId });
-			roomName = board ? board.name : roomId;
+			let board = await Board.findOne({ roomId });
+			
+			// If board doesn't exist, create it
+			if (!board) {
+				console.log(`Creating new board for room ${roomId}`);
+				board = new Board({
+					roomId,
+					name: roomId, // Default name is the roomId
+					history: [],
+					createdBy: userId || socket.id, // Use socket.id for guest users
+				});
+				await board.save();
+			}
+			roomName = board.name;
 		} catch (error) {
+			console.error("Error creating/finding board:", error);
 			roomName = roomId;
 		}
 
@@ -425,7 +438,7 @@ io.on("connection", (socket) => {
 			const boardForAuth = await Board.findOne({ roomId });
 
 			if (boardForAuth && boardForAuth.isPasswordProtected) {
-				const isOwner = !!(userId && boardForAuth.createdBy === userId);
+				const isOwner = !!(userId ? boardForAuth.createdBy === userId : boardForAuth.createdBy === socket.id);
 				const isAuthorized = rooms[roomId]?.authorizedUsers?.includes(userId || socket.id);
 
 				if (!isOwner && !isAuthorized && !hasLocalAuth) {
@@ -509,7 +522,8 @@ io.on("connection", (socket) => {
 			});
 
 			// Check and notify if user is the owner
-			const isOwner = !!(userId && board.createdBy === userId);
+			// Allow non-logged in users (using socketId as createdBy) to be owners
+			const isOwner = !!(userId ? board.createdBy === userId : board.createdBy === socketId);
 			socket.emit("userRights", { isOwner });
 
 			// Notify all clients about the new user
@@ -783,15 +797,16 @@ io.on("connection", (socket) => {
 	socket.on("checkOwnership", async (data) => {
 		try {
 			const { roomId } = data;
-			// Get user ID from the room users
-			const userId = rooms[roomId]?.users[socket.id]?.userId;
+			// Get user info from the room users
+			const userInfo = rooms[roomId]?.users[socket.id];
+			const userId = userInfo?.userId;
 
 			// Fetch the board from the database
 			const board = await Board.findOne({ roomId });
 
 			if (board) {
-				// Ensure we have a boolean, not undefined or null
-				const isOwner = !!(userId && board.createdBy === userId);
+				// Allow non-logged in users (using socketId as createdBy) to be owners
+				const isOwner = !!(userId ? board.createdBy === userId : board.createdBy === socket.id);
 				socket.emit("userRights", { isOwner });
 			} else {
 				//console.log(`Board not found for ownership check: ${roomId}`);
@@ -883,6 +898,10 @@ app.get("/login", (req, res) => {
 
 app.get("/register", (req, res) => {
 	res.sendFile(path.join(__dirname, "../frontend/register.html"));
+});
+
+app.get("/health", (req, res) => {
+	res.sendFile(path.join(__dirname, "../frontend/health.html"));
 });
 
 // Create test user if not exists
@@ -983,77 +1002,18 @@ function findAndKillProcessOnPort(port) {
 	});
 }
 
-// Start server with port checking - improved version
-async function startServer() {
-	let inUse = await isPortInUse(PORT);
-	let attempts = 0;
-	const maxAttempts = 3;
-
-	while (inUse && attempts < maxAttempts) {
-		attempts++;
-		console.log(
-			`Port ${PORT} is already in use. Attempting to kill the process... (Attempt ${attempts}/${maxAttempts})`
-		);
-
-		if (process.platform === "win32") {
-			await findAndKillProcessOnPort(PORT);
-		} else {
-			// For Mac/Linux
-			try {
-				require("child_process").execSync(`lsof -i :${PORT} -t | xargs kill -9`);
-				console.log(`Process using port ${PORT} was terminated`);
-			} catch (error) {
-				console.warn(`Could not kill process on port ${PORT}: ${error.message}`);
-			}
-		}
-
-		// Wait for the port to be released
-		await new Promise((resolve) => setTimeout(resolve, 2000));
-
-		// Check again if the port is still in use
-		inUse = await isPortInUse(PORT);
-	}
-
-	if (inUse) {
-		console.error(`Port ${PORT} is still in use after ${maxAttempts} attempts.`);
-		console.error(`Please manually close the application using port ${PORT} and try again.`);
-		process.exit(1);
-	}
-
-	// Start the server
-	server.listen(PORT, () => {
-		console.log(`Server running on port ${PORT}`);
-	});
-
-	// Handle any errors that might still occur
-	server.on("error", (e) => {
-		if (e.code === "EADDRINUSE") {
-			console.error(`Failed to bind to port ${PORT}. The port is still in use.`);
-			process.exit(1);
-		} else {
-			console.error("Server error:", e);
-		}
-	});
-}
-
-// Start server only if not in Vercel serverless environment
-if (process.env.VERCEL !== '1') {
-	startServer();
-}
-
-// Export app for Vercel serverless functions
-module.exports = app;
-
 // Add this new route to fetch images for a room
 app.get("/api/boards/:roomId/images", async (req, res) => {
 	try {
 		const { roomId } = req.params;
 		const board = await Board.findOne({ roomId }).select("images");
-		if (board && board.images) {
-			res.status(200).json({ images: board.images });
-		} else {
-			res.status(404).json({ error: "No images found for this board" });
+		if (!board) {
+			// If board doesn't exist, return empty images array instead of 404
+			// This allows the frontend to handle new boards gracefully
+			return res.status(200).json({ images: [] });
 		}
+		// Return images array (empty or with data)
+		res.status(200).json({ images: board.images || [] });
 	} catch (error) {
 		console.error("Error fetching images:", error);
 		res.status(500).json({ error: "Server error" });
@@ -1124,3 +1084,147 @@ app.use((err, req, res, next) => {
 	}
 	next(err);
 });
+
+// Keep-alive tracking
+const serverHealth = {
+	startTime: Date.now(),
+	lastPing: Date.now(),
+	nextPing: Date.now() + (10 * 60 * 1000), // 10 minutes
+	pingCount: 0,
+	pingInterval: 10 * 60 * 1000, // 10 minutes in milliseconds
+	status: 'active'
+};
+
+// Keep-alive ping endpoint
+app.post("/api/ping", (req, res) => {
+	serverHealth.lastPing = Date.now();
+	serverHealth.nextPing = Date.now() + serverHealth.pingInterval;
+	serverHealth.pingCount++;
+	serverHealth.status = 'active';
+	
+	console.log(`Keep-alive ping received (#${serverHealth.pingCount})`);
+	
+	res.status(200).json({
+		message: "Pong",
+		timestamp: serverHealth.lastPing,
+		nextPing: serverHealth.nextPing
+	});
+});
+
+// Health dashboard endpoint
+app.get("/api/health", (req, res) => {
+	const now = Date.now();
+	const uptime = now - serverHealth.startTime;
+	const timeSinceLastPing = now - serverHealth.lastPing;
+	const timeUntilNextPing = serverHealth.nextPing - now;
+	
+	// Calculate uptime in a human-readable format
+	const uptimeSeconds = Math.floor(uptime / 1000);
+	const uptimeDays = Math.floor(uptimeSeconds / 86400);
+	const uptimeHours = Math.floor((uptimeSeconds % 86400) / 3600);
+	const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
+	const uptimeSecsRemaining = uptimeSeconds % 60;
+	
+	res.status(200).json({
+		status: serverHealth.status,
+		uptime: {
+			milliseconds: uptime,
+			formatted: `${uptimeDays}d ${uptimeHours}h ${uptimeMinutes}m ${uptimeSecsRemaining}s`
+		},
+		lastPing: {
+			timestamp: serverHealth.lastPing,
+			ago: timeSinceLastPing,
+			formatted: formatDuration(timeSinceLastPing)
+		},
+		nextPing: {
+			timestamp: serverHealth.nextPing,
+			in: Math.max(0, timeUntilNextPing),
+			formatted: formatDuration(Math.max(0, timeUntilNextPing))
+		},
+		pingCount: serverHealth.pingCount,
+		pingInterval: {
+			milliseconds: serverHealth.pingInterval,
+			formatted: formatDuration(serverHealth.pingInterval)
+		},
+		startTime: serverHealth.startTime
+	});
+});
+
+// Helper function to format duration
+function formatDuration(ms) {
+	const seconds = Math.floor(ms / 1000);
+	const minutes = Math.floor(seconds / 60);
+	const hours = Math.floor(minutes / 60);
+	const days = Math.floor(hours / 24);
+	
+	if (days > 0) {
+		return `${days}d ${hours % 24}h ${minutes % 60}m`;
+	} else if (hours > 0) {
+		return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+	} else if (minutes > 0) {
+		return `${minutes}m ${seconds % 60}s`;
+	} else {
+		return `${seconds}s`;
+	}
+}
+
+// Start server with port checking - improved version
+async function startServer() {
+	let inUse = await isPortInUse(PORT);
+	let attempts = 0;
+	const maxAttempts = 3;
+
+	while (inUse && attempts < maxAttempts) {
+		attempts++;
+		console.log(
+			`Port ${PORT} is already in use. Attempting to kill the process... (Attempt ${attempts}/${maxAttempts})`
+		);
+
+		if (process.platform === "win32") {
+			await findAndKillProcessOnPort(PORT);
+		} else {
+			// For Mac/Linux
+			try {
+				require("child_process").execSync(`lsof -i :${PORT} -t | xargs kill -9`);
+				console.log(`Process using port ${PORT} was terminated`);
+			} catch (error) {
+				console.warn(`Could not kill process on port ${PORT}: ${error.message}`);
+			}
+		}
+
+		// Wait for the port to be released
+		await new Promise((resolve) => setTimeout(resolve, 2000));
+
+		// Check again if the port is still in use
+		inUse = await isPortInUse(PORT);
+	}
+
+	if (inUse) {
+		console.error(`Port ${PORT} is still in use after ${maxAttempts} attempts.`);
+		console.error(`Please manually close the application using port ${PORT} and try again.`);
+		process.exit(1);
+	}
+
+	// Start the server
+	server.listen(PORT, () => {
+		console.log(`Server running on port ${PORT}`);
+	});
+
+	// Handle any errors that might still occur
+	server.on("error", (e) => {
+		if (e.code === "EADDRINUSE") {
+			console.error(`Failed to bind to port ${PORT}. The port is still in use.`);
+			process.exit(1);
+		} else {
+			console.error("Server error:", e);
+		}
+	});
+}
+
+// Start server only if not in Vercel serverless environment
+if (process.env.VERCEL !== '1') {
+	startServer();
+}
+
+// Export app for Vercel serverless functions
+module.exports = app;

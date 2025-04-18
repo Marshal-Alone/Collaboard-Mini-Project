@@ -189,7 +189,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				pastBoardsSection.style.display = "block";
 				if (loginPrompt) loginPrompt.style.display = "block";
 				if (boardsList) boardsList.style.display = "none";
-				startBoarding.disabled = "true";
+				// startBoarding.disabled = "true";
 			}
 		}
 	};
@@ -224,7 +224,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const welcomeMessage = document.querySelector(".welcome-message");
 
 		if (welcomeMessage) {
-			welcomeMessage.style.display = user ? "block" : "none";
+			// welcomeMessage.style.display = user ? "block" : "none";
 		}
 
 		if (userNameDisplay) {
