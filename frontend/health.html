@@ -357,7 +357,10 @@
     </div>
 
     <script type="module">
-        import config from './config.js';
+        // Always check production server on Render
+        const config = {
+            API_URL: 'https://collaborative-whiteboard-i6ri.onrender.com'
+        };
 
         let autoRefreshInterval = null;
         let autoRefreshEnabled = true;
@@ -390,7 +393,7 @@
         // Fetch health data from server
         async function fetchHealth() {
             try {
-                const response = await fetch(`${config.API_URL}/api/health`);
+                const response = await fetch(`https://collaborative-whiteboard-i6ri.onrender.com/api/health/api/health`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
