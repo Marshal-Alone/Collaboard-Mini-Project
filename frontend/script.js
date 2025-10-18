@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const config = {
 		API_URL: window.location.hostname === 'localhost' 
 			? 'http://localhost:5050' 
-			: window.location.origin
+			: 'https://collaborative-whiteboard-i6ri.onrender.com'
 	};
 
 	// Function to load past boards

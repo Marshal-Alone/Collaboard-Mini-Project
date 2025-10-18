@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	// API URL configuration - dynamic based on environment
 	const API_URL = window.location.hostname === 'localhost'
 		? 'http://localhost:5050'
-		: window.location.origin;
+		: 'https://collaborative-whiteboard-i6ri.onrender.com';
 	
 	const socket = io(socketUrl, {
 		transports: ["websocket", "polling"],
