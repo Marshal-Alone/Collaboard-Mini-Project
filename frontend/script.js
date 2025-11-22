@@ -1,10 +1,9 @@
-import config from "./config.js";
 document.addEventListener("DOMContentLoaded", function () {
 	// Dynamic configuration based on environment
 	const config = {
-		API_URL: window.location.hostname === 'localhost' 
-			? 'http://localhost:5050' 
-			: 'https://collaborative-whiteboard-i6ri.onrender.com'
+		API_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+			? 'http://localhost:5050'
+			: window.location.origin
 	};
 
 	// Function to load past boards
@@ -151,7 +150,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const loginPrompt = document.getElementById("loginPrompt");
 		const boardsList = document.getElementById("pastBoardsList");
 		const noBoards = document.getElementById("noBoards");
-		const startBoarding=document.getElementById("startBoarding");
+		const startBoarding = document.getElementById("startBoarding");
 
 		if (pastBoardsSection) {
 			const user = await checkAuth();
@@ -159,7 +158,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (user) {
 				// User is logged in - initially hide the section and check for boards
 				if (loginPrompt) loginPrompt.style.display = "none";
-				 
+
 				if (boardsList) boardsList.style.display = "grid";
 
 				try {
@@ -244,9 +243,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     <a href="#pricing">Pricing</a>
                     <a href="#about">About</a>
                     <a href="health.html" class="btn btn-outline">Server Health</a>
-                    <span style="font-size: 1.2rem; font-weight: bold;" class="user-greeting" title="Logged in as ${
-											user.email || ""
-										}">
+                    <span style="font-size: 1.2rem; font-weight: bold;" class="user-greeting" title="Logged in as ${user.email || ""
+					}">
                         ${user.name}
                     </span>
                     <button id="logoutBtn" class="btn btn-outline">Log out</button>

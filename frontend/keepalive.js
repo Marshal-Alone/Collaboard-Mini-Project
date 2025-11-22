@@ -5,18 +5,16 @@ class KeepAliveService {
         this.shortInterval = config.shortInterval || 2 * 60 * 1000; // 2 minutes for frequent pings
         this.longInterval = config.longInterval || 4 * 60 * 1000;  // 4 minutes for maintenance pings
         this.currentInterval = this.shortInterval; // Start with frequent pings
-        
+
         // Determine API URL dynamically
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        this.apiUrl = isLocalhost 
-            ? 'http://localhost:5050' 
-            : 'https://collaborative-whiteboard-i6ri.onrender.com';
-        
+        this.apiUrl = isLocalhost
+            ? 'http://localhost:5050'
+            : window.location.origin;
+
         // Additional servers to keep alive (optional)
-        this.additionalServers = config.additionalServers || [
-            'https://farm-connnect.onrender.com'
-        ];
-        
+        this.additionalServers = config.additionalServers || [];
+
         this.pingEndpoint = `${this.apiUrl}/api/ping`;
         this.healthEndpoint = `${this.apiUrl}/api/health`;
         this.timerId = null;
@@ -29,15 +27,9 @@ class KeepAliveService {
             onError: [],
             onHealthUpdate: []
         };
-        
+
         console.log('[KeepAlive] Service initialized');
         console.log('[KeepAlive] Primary API URL:', this.apiUrl);
-        console.log('[KeepAlive] Additional servers:', this.additionalServers.length);
-        this.additionalServers.forEach((server, index) => {
-            console.log(`[KeepAlive]   ${index + 1}. ${server}`);
-        });
-        console.log('[KeepAlive] Short interval:', this.shortInterval / 1000, 'seconds');
-        console.log('[KeepAlive] Long interval:', this.longInterval / 1000, 'seconds');
     }
 
     // Start the keep-alive pings
@@ -77,7 +69,7 @@ class KeepAliveService {
         if (this.timerId) {
             clearTimeout(this.timerId);
         }
-        
+
         this.timerId = setTimeout(() => {
             if (this.isActive) {
                 this.ping();
@@ -88,7 +80,7 @@ class KeepAliveService {
     // Send a ping to the server
     async ping() {
         const startTime = Date.now();
-        
+
         try {
             // Ping primary server
             const response = await fetch(this.pingEndpoint, {
@@ -101,19 +93,21 @@ class KeepAliveService {
             });
 
             if (!response.ok) {
+                // If endpoint doesn't exist (404), just ignore it silently
+                if (response.status === 404) return;
                 throw new Error(`Ping failed with status: ${response.status}`);
             }
 
             const data = await response.json();
             const responseTime = Date.now() - startTime;
-            
+
             this.lastPingTime = Date.now();
             this.nextPingTime = Date.now() + this.currentInterval;
             this.consecutiveSuccesses++;
 
             // Log response time to detect cold starts
             if (responseTime > 5000) {
-                console.log(`[KeepAlive] Primary server ping successful (was cold, took ${(responseTime/1000).toFixed(1)}s)`);
+                console.log(`[KeepAlive] Primary server ping successful (was cold, took ${(responseTime / 1000).toFixed(1)}s)`);
             } else {
                 console.log(`[KeepAlive] Primary server ping successful (${responseTime}ms)`);
             }
@@ -123,9 +117,6 @@ class KeepAliveService {
                 this.currentInterval = this.longInterval;
                 console.log('[KeepAlive] Server warmed up, switching to maintenance interval:', this.longInterval / 1000, 'seconds');
             }
-
-            // Ping additional servers (don't wait for responses)
-            this.pingAdditionalServers();
 
             // Trigger callbacks
             this.callbacks.onPing.forEach(callback => callback(data));
@@ -137,93 +128,19 @@ class KeepAliveService {
 
         } catch (error) {
             const responseTime = Date.now() - startTime;
-            console.error(`[KeepAlive] Primary server ping failed after ${(responseTime/1000).toFixed(1)}s:`, error.message);
-            
+            console.error(`[KeepAlive] Primary server ping failed after ${(responseTime / 1000).toFixed(1)}s:`, error.message);
+
             // Reset to short interval on error (server might be sleeping)
             this.consecutiveSuccesses = 0;
             this.currentInterval = this.shortInterval;
-            
-            // Still try to ping additional servers
-            this.pingAdditionalServers();
-            
+
             // Trigger error callbacks
             this.callbacks.onError.forEach(callback => callback(error));
-            
+
             // Retry after short interval
             if (this.isActive) {
                 this.scheduleNextPing();
             }
-        }
-    }
-
-    // Ping additional servers asynchronously
-    async pingAdditionalServers() {
-        if (!this.additionalServers || this.additionalServers.length === 0) {
-            return;
-        }
-
-        // Ping all additional servers in parallel
-        const pingPromises = this.additionalServers.map(async (serverUrl, index) => {
-            try {
-                const startTime = Date.now();
-                const healthUrl = `${serverUrl}/api/health`;
-                
-                const response = await fetch(healthUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    signal: AbortSignal.timeout(30000) // 30 second timeout
-                });
-
-                const responseTime = Date.now() - startTime;
-
-                if (response.ok) {
-                    if (responseTime > 5000) {
-                        console.log(`[KeepAlive] Additional server ${index + 1} (${serverUrl}) ping successful (was cold, took ${(responseTime/1000).toFixed(1)}s)`);
-                    } else {
-                        console.log(`[KeepAlive] Additional server ${index + 1} (${serverUrl}) ping successful (${responseTime}ms)`);
-                    }
-                } else {
-                    console.warn(`[KeepAlive] Additional server ${index + 1} (${serverUrl}) responded with status: ${response.status}`);
-                }
-            } catch (error) {
-                console.warn(`[KeepAlive] Additional server ${index + 1} (${serverUrl}) ping failed:`, error.message);
-            }
-        });
-
-        // Don't wait for all promises to complete, let them run in background
-        Promise.allSettled(pingPromises).then((results) => {
-            const successful = results.filter(r => r.status === 'fulfilled').length;
-            console.log(`[KeepAlive] Additional servers: ${successful}/${this.additionalServers.length} pinged successfully`);
-        });
-    }
-
-    // Get current health status from server
-    async getHealth() {
-        try {
-            const response = await fetch(this.healthEndpoint, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`Health check failed with status: ${response.status}`);
-            }
-
-            const healthData = await response.json();
-            
-            // Trigger health update callbacks
-            this.callbacks.onHealthUpdate.forEach(callback => callback(healthData));
-
-            return healthData;
-
-        } catch (error) {
-            console.error('[KeepAlive] Health check failed:', error);
-            this.callbacks.onError.forEach(callback => callback(error));
-            return null;
         }
     }
 
@@ -236,40 +153,18 @@ class KeepAliveService {
     onError(callback) {
         this.callbacks.onError.push(callback);
     }
-
-    // Register callback for health updates
-    onHealthUpdate(callback) {
-        this.callbacks.onHealthUpdate.push(callback);
-    }
-
-    // Get service status
-    getStatus() {
-        return {
-            isActive: this.isActive,
-            currentInterval: this.currentInterval,
-            shortInterval: this.shortInterval,
-            longInterval: this.longInterval,
-            lastPingTime: this.lastPingTime,
-            nextPingTime: this.nextPingTime,
-            consecutiveSuccesses: this.consecutiveSuccesses
-        };
-    }
 }
 
 // Create a global instance with configuration
 window.keepAliveService = new KeepAliveService({
     shortInterval: 2 * 60 * 1000,  // 2 minutes - aggressive wake-up
-    longInterval: 4 * 60 * 1000,   // 4 minutes - keep server warm
-    additionalServers: [
-        'https://farm-connnect.onrender.com'  // Add more servers here as needed
-    ]
+    longInterval: 4 * 60 * 1000    // 4 minutes - keep server warm
 });
 
 // Function to start the service
 function startKeepAlive() {
-    if (!window.keepAliveService.isActive) {
+    if (window.keepAliveService && !window.keepAliveService.isActive) {
         window.keepAliveService.start();
-        console.log('[KeepAlive] Service started automatically');
     }
 }
 

@@ -12,15 +12,15 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	// Socket.io setup - dynamic URL based on environment
-	const socketUrl = window.location.hostname === 'localhost' 
-		? 'http://localhost:5050' 
+	const socketUrl = window.location.hostname === 'localhost'
+		? 'http://localhost:5050'
 		: window.location.origin;
-	
+
 	// API URL configuration - dynamic based on environment
 	const API_URL = window.location.hostname === 'localhost'
 		? 'http://localhost:5050'
-		: 'https://collaborative-whiteboard-i6ri.onrender.com';
-	
+		: window.location.origin;
+
 	const socket = io(socketUrl, {
 		transports: ["websocket", "polling"],
 		reconnectionAttempts: 5,
